@@ -49,12 +49,12 @@ my %isp-servers     = (
 # $s.stdout.lines.tap: { .say if .lc.contains(any <gfldex peppmeyer>) }
 
 sub MAIN (
-    Str:D   :$isp-server-name!,                     #= ISP server name
+    Str:D   :$isp-server!,                          #= ISP server name
     Str:D   :$isp-admin!,                           #= ISP admin name
 ) {
-    my $SERVER_NAME = $isp-server-name.uc;
+    my $SERVER_NAME = $isp-server.uc;
     die '--isp-server-name not any of ' ~ %isp-servers.keys.sort unless %isp-servers{$SERVER_NAME}:exists;
-    $proc           = run   
+    my $proc                = run   
 #                           '/usr/bin/stdbuf',
 #                           '-i0',
 #                           '-o0',
@@ -63,15 +63,37 @@ sub MAIN (
                             '-SE=' ~ $isp-admin ~ '_' ~ $SERVER_NAME,
                             '-ID=' ~ $isp-admin,
                             '-PA=' ~ KHPH.new(:stash-path($*HOME ~ '/.isp/admin/' ~ $SERVER_NAME ~ '/' ~ $isp-admin ~ '.khph')).expose,
-                            '-TABDELIMITED',
-                            'QUERY',
-                            'ACTLOG',
+#                           '-TABDELIMITED',
+                            '-CONSOLE',
+#                           'QUERY',
+#                           'ACTLOG',
+#                           'BEGINTIME=NOW',
                             :err,
                             :out;
-    my $err         = $proc.err.slurp(:close);
-    my $out         = $proc.out.slurp(:close);
+#   my $err                 = $proc.err.slurp(:close);      put $err;
+#   my $out                 = $proc.out.slurp(:close);      put $out;
 
-put $out;
+    my $lines = supply {
+        whenever start $proc.out.Supply {
+            whenever .lines { put 'X'; .emit }
+        }
+    }.Channel;
+
+    my $running = True;
+    $lines.closed.then: { $running = False }
+
+    while $running {
+        with $lines.poll() -> $line {
+            put "Process '$line'";
+        }
+        put 'Do something else...';
+        sleep ½;
+        sleep ½;
+    }
+    put "I'm done.";
+}
+
+=finish
 
 ### my $lines = $*IN.Supply.lines.Channel;
 #   my $lines = supply {
