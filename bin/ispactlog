@@ -63,39 +63,43 @@ sub MAIN (
                             '-SE=' ~ $isp-admin ~ '_' ~ $SERVER_NAME,
                             '-ID=' ~ $isp-admin,
                             '-PA=' ~ KHPH.new(:stash-path($*HOME ~ '/.isp/admin/' ~ $SERVER_NAME ~ '/' ~ $isp-admin ~ '.khph')).expose,
-#                           '-TABDELIMITED',
+                            '-DATAONLY=YES',
+                            '-TABDELIMITED',
                             '-CONSOLE',
 #                           'QUERY',
 #                           'ACTLOG',
 #                           'BEGINTIME=NOW',
-                            :err,
+#                           :err,
                             :out;
 #   my $err                 = $proc.err.slurp(:close);      put $err;
 #   my $out                 = $proc.out.slurp(:close);      put $out;
 
     my $lines = supply {
-        whenever start $proc.out.Supply {
-            whenever .lines { put 'X'; .emit }
+        whenever start $proc.out {
+            whenever .lines { .emit }
         }
     }.Channel;
-
-    my $running = True;
-    $lines.closed.then: { $running = False }
-
-    while $running {
-        with $lines.poll() -> $line {
-            put "Process '$line'";
-        }
-        put 'Do something else...';
-        sleep ½;
-        sleep ½;
+    for $lines.list -> $line {
+        put DateTime.now(formatter => { sprintf "%02d:%02d", .hour, .minute }) ~ '  ' ~ $line;
     }
-    put "I'm done.";
+
+#   my $running = True;
+#   $lines.closed.then: { $running = False }
+#   while $running {
+#       with $lines.poll() -> $line {
+#           put "Process '$line'";
+#       }
+#       put 'Do something else...';
+#       sleep .5;
+#   }
+#   put "I'm done.";
 }
 
 =finish
-
-### my $lines = $*IN.Supply.lines.Channel;
+###
+### On-demand supply method...
+###
+##  my $lines = $*IN.Supply.lines.Channel;
 #   my $lines = supply {
 #       whenever start $*IN.Supply {
 #           whenever .lines { .emit }
