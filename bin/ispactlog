@@ -79,19 +79,22 @@ sub MAIN (
             whenever .lines { .emit }
         }
     }.Channel;
-    for $lines.list -> $line {
-        put DateTime.now(formatter => { sprintf "%02d:%02d", .hour, .minute }) ~ '  ' ~ $line;
-    }
 
-#   my $running = True;
-#   $lines.closed.then: { $running = False }
-#   while $running {
-#       with $lines.poll() -> $line {
-#           put "Process '$line'";
-#       }
-#       put 'Do something else...';
-#       sleep .5;
+### BLOCKING
+#   for $lines.list -> $line {
+#       put colored(DateTime.now(formatter => { sprintf "%02d:%02d:%02d", .hour, .minute, .second }) ~ '  ' ~ $line, 'cyan');
 #   }
+### NON-BLOCKING
+    my $running = True;
+    $lines.closed.then: { $running = False }
+    while $running {
+#       with $lines.poll() -> $line {
+        while $lines.poll() -> $line {
+            put colored(DateTime.now(formatter => { sprintf "%02d:%02d:%02d", .hour, .minute, .second }) ~ '  ' ~ $line, 'cyan');
+        }
+#       put 'Do something else...';
+        sleep .25;
+    }
 #   put "I'm done.";
 }
 
