@@ -88,14 +88,20 @@ sub MAIN (
     my $running = True;
     $lines.closed.then: { $running = False }
     while $running {
-#       with $lines.poll() -> $line {
         while $lines.poll() -> $line {
+            next unless acceptable-active-log-record($line);
             put colored(DateTime.now(formatter => { sprintf "%02d:%02d:%02d", .hour, .minute, .second }) ~ '  ' ~ $line, 'cyan');
         }
 #       put 'Do something else...';
         sleep .25;
     }
 #   put "I'm done.";
+}
+
+sub acceptable-active-log-record(Str:D $record) {
+    return if $record ~~ /AN.....I/;
+    return unless $record ~~ /ISPLC0/;
+    return True;
 }
 
 =finish
