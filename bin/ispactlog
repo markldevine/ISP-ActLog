@@ -100,7 +100,6 @@ sub MAIN (
 
 sub acceptable-active-log-record(Str:D $record) {
     return if $record ~~ /AN.....I/;
-    return unless $record ~~ /ISPLC0/;
     return True;
 }
 
