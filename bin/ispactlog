@@ -1,5 +1,6 @@
 #!/usr/bin/env raku
 
+use ISP::Servers;
 use KHPH;
 use Terminal::ANSIColor;
 use Data::Dump::Tree;   
@@ -10,61 +11,47 @@ my %isp-servers     = (
                         ISPLC01 => 0,
                         ISPLC02 => 0,
                       );
-#constant @redis-servers = <jgstmgtgate1lpv.wmata.local ctstmgtgate1lpv.wmata.local>;
-
-#my @redis-clis;
-#for @redis-servers -> $redis-server {
-#    my @cmd-string = sprintf("ssh -L 127.0.0.1:6379:%s:6379 %s /usr/bin/redis-cli", $redis-server, $redis-server).split: /\s+/;
-#    @redis-clis.push: @cmd-string;
-#}
-
-#for @redis-clis -> @redis-cli {
-#put @redis-cli;
-#    my @rcmd        = flat @redis-cli,
-#                      '--raw',
-#                      'KEYS',
-#                      'eb:isp:servers:*';
-#    my $proc        = run   @rcmd, :out, :err;
-#    my $out         = $proc.out.slurp(:close);
-#    my $err         = $proc.err.slurp(:close);
-#    fail 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
-#    if $out {
-#        my @ispssks = $out.chomp.split("\n");
-#        die "No ISP server site keys!" unless @ispssks;
-#        @rcmd    = flat @redis-cli,
-#                   '--raw',
-#                   'SUNION',
-#                   @ispssks;
-#        $proc    = run   @rcmd, :out, :err;
-#        $out     = $proc.out.slurp(:close);
-#        $err     = $proc.err.slurp(:close); 
-#        fail 'FAILED: ' ~ @rcmd ~ ":\t" ~ $err if $err;
-#        if $out {
-#            %isp-servers = $out.chomp.split("\n").map: { $_.uc => 0 };
-#            last;
-#        }
-#    }
-#}
-
 # $s.stdout.lines.tap: { .say if .lc.contains(any <gfldex peppmeyer>) }
+
+class ISPActLogRecord {
+    my grammar ISPActLogRecord-Grammar {
+        token TOP           { ^ <msg-prefix> <msg-number> <msg-type> \s+ <msg-text> $   }
+        token msg-prefix    { 'AN' \w                                                   }
+        token msg-number    { \d\d\d\d                                                  }
+        token msg-type      { <[EISWK]>                                                 }
+        token msg-text      { .+                                                        }
+    }
+
+    has Str $.actlog-record is required;
+    has Str $.msg-time;
+    has Str $.msg-prefix;
+    has Str $.msg-number;
+    has Str $.msg-type;
+    has Str $.msg-text;
+
+    submethod TWEAK {
+        $!msg-time          = DateTime.now(formatter => { sprintf "%02d:%02d:%02d", .hour, .minute, .second }).Str;
+        my $match           = ISPActLogRecord-Grammar.parse($!actlog-record);
+        $!msg-prefix        = $match<msg-prefix>.Str;
+        $!msg-number        = $match<msg-number>.Str;
+        $!msg-type          = $match<msg-type>.Str;
+        $!msg-text          = $match<msg-text>.Str;
+    }
+}
 
 sub MAIN (
     Str:D   :$isp-server!,                          #= ISP server name
     Str:D   :$isp-admin!,                           #= ISP admin name
 ) {
-    my $SERVER_NAME = $isp-server.uc;
+    my $SERVER_NAME         = ISP::Servers.new().isp-server($isp-server);
     die '--isp-server-name not any of ' ~ %isp-servers.keys.sort unless %isp-servers{$SERVER_NAME}:exists;
     my $proc                = run   
-#                           '/usr/bin/stdbuf',
-#                           '-i0',
-#                           '-o0',
-#                           '-e0',
                             '/usr/bin/dsmadmc',
                             '-SE=' ~ $isp-admin ~ '_' ~ $SERVER_NAME,
                             '-ID=' ~ $isp-admin,
                             '-PA=' ~ KHPH.new(:stash-path($*HOME ~ '/.isp/admin/' ~ $SERVER_NAME ~ '/' ~ $isp-admin ~ '.khph')).expose,
                             '-DATAONLY=YES',
-                            '-TABDELIMITED',
+#                           '-TABDELIMITED',
                             '-CONSOLE',
 #                           'QUERY',
 #                           'ACTLOG',
@@ -88,9 +75,13 @@ sub MAIN (
     my $running = True;
     $lines.closed.then: { $running = False }
     while $running {
-        while $lines.poll() -> $line {
-            next unless acceptable-active-log-record($line);
-            put colored(DateTime.now(formatter => { sprintf "%02d:%02d:%02d", .hour, .minute, .second }) ~ '  ' ~ $line, 'cyan');
+        while $lines.poll() -> $actlog-record {
+            my $actlog-record-object = ISPActLogRecord.new(:$actlog-record);
+            next unless acceptable-active-log-record($actlog-record-object);
+            put colored($actlog-record-object.msg-time ~
+                        '  ' ~ $actlog-record-object.msg-prefix ~ $actlog-record-object.msg-number ~ $actlog-record-object.msg-type ~
+                        '  ' ~ $actlog-record-object.msg-text,
+                        'cyan');
         }
 #       put 'Do something else...';
         sleep .25;
@@ -98,9 +89,8 @@ sub MAIN (
 #   put "I'm done.";
 }
 
-sub acceptable-active-log-record(Str:D $record) {
-    return if $record ~~ /AN.....I/;
-#   return unless $record ~~ /JGDCIEVAULT01PV/;
+sub acceptable-active-log-record(ISPActLogRecord:D $obj) {
+    return if $obj.msg-type eq 'I';
     return True;
 }
 
