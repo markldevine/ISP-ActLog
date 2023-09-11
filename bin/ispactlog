@@ -89,8 +89,13 @@ sub MAIN (
 #   put "I'm done.";
 }
 
+<<<<<<< HEAD
 sub acceptable-active-log-record(ISPActLogRecord:D $obj) {
     return if $obj.msg-type eq 'I';
+=======
+sub acceptable-active-log-record(Str:D $record) {
+    return if $record ~~ /AN.....I/;
+>>>>>>> 6c3f80647aff5dc3389e38b3d260add48dadc3a4
     return True;
 }
 
