@@ -7,12 +7,6 @@ use Data::Dump::Tree;
 #use Grammar::Debugger; 
 #use Grammar::Tracer;
 
-my %isp-servers     = (
-                        ISPLC01 => 0,
-                        ISPLC02 => 0,
-                      );
-# $s.stdout.lines.tap: { .say if .lc.contains(any <gfldex peppmeyer>) }
-
 class ISPActLogRecord {
     my grammar ISPActLogRecord-Grammar {
         token TOP           { ^ <msg-prefix> <msg-number> <msg-type> \s+ <msg-text> $   }
@@ -44,23 +38,14 @@ sub MAIN (
     Str:D   :$isp-admin!,                           #= ISP admin name
 ) {
     my $SERVER_NAME         = ISP::Servers.new().isp-server($isp-server);
-    die '--isp-server-name not any of ' ~ %isp-servers.keys.sort unless %isp-servers{$SERVER_NAME}:exists;
     my $proc                = run   
                             '/usr/bin/dsmadmc',
                             '-SE=' ~ $isp-admin ~ '_' ~ $SERVER_NAME,
                             '-ID=' ~ $isp-admin,
                             '-PA=' ~ KHPH.new(:stash-path($*HOME ~ '/.isp/admin/' ~ $SERVER_NAME ~ '/' ~ $isp-admin ~ '.khph')).expose,
                             '-DATAONLY=YES',
-#                           '-TABDELIMITED',
                             '-CONSOLE',
-#                           'QUERY',
-#                           'ACTLOG',
-#                           'BEGINTIME=NOW',
-#                           :err,
                             :out;
-#   my $err                 = $proc.err.slurp(:close);      put $err;
-#   my $out                 = $proc.out.slurp(:close);      put $out;
-
     my $lines = supply {
         whenever start $proc.out {
             whenever .lines { .emit }
@@ -90,30 +75,9 @@ sub MAIN (
 }
 
 sub acceptable-active-log-record(ISPActLogRecord:D $obj) {
-    return if $obj.msg-type eq 'I';
+# $s.stdout.lines.tap: { .say if .lc.contains(any <gfldex peppmeyer>) }
+#   return if $obj.msg-type eq 'I';
     return True;
 }
 
 =finish
-###
-### On-demand supply method...
-###
-##  my $lines = $*IN.Supply.lines.Channel;
-#   my $lines = supply {
-#       whenever start $*IN.Supply {
-#           whenever .lines { .emit }
-#       }
-#   }.Channel;
-
-#   my $running = True;
-#   $lines.closed.then: { $running = False }
-
-#   while $running {
-#       with $lines.poll() -> $line {
-#           put "Process '$line'";
-#       }
-#       put 'Do something else...';
-#       sleep ½;
-#   }
-#   put "I'm done.";
-}
